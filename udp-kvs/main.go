@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net"
 )
@@ -22,13 +23,11 @@ func sendMessage(addr *net.UDPAddr, conn *net.UDPConn, message []byte) {
 }
 
 func handleRequest(addr *net.UDPAddr, conn *net.UDPConn, buf []byte) {
-	data := buf[:]
-	log.Printf("received: %q", data)
+	log.Printf("received: %q", buf)
 	defer log.Println()
 
-	if bytes.Contains(data, []byte("=")) {
-		tmp := bytes.SplitN(data, []byte("="), 2)
-
+	tmp := bytes.SplitN(buf, []byte("="), 2)
+	if len(tmp) >= 2 {
 		key := string(tmp[0])
 		value := tmp[1]
 		if key == "version" {
@@ -38,19 +37,14 @@ func handleRequest(addr *net.UDPAddr, conn *net.UDPConn, buf []byte) {
 		log.Printf("key = %s, value = %q, store", key, value)
 
 		kvs[key] = value[:]
-	} else {
-		key := string(data)
-		value, ok := kvs[key]
-		if !ok {
-			value = []byte("")
-		}
-		log.Printf("key = %s, value = %q, retrieve", key, value)
-
-		kb := []byte(key)
-		kb = append(kb, '=')
-		kb = append(kb, value...)
-		sendMessage(addr, conn, kb)
+		return
 	}
+
+	key := string(buf)
+	value := kvs[key]
+	log.Printf("key = %s, value = %q, retrieve", key, value)
+
+	sendMessage(addr, conn, fmt.Appendf(nil, "%s=%s", key, value))
 }
 
 func main() {
@@ -73,6 +67,5 @@ func main() {
 		}
 
 		handleRequest(ad, listener, buf[:n])
-		buf = make([]byte, 1024)
 	}
 }
